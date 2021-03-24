@@ -20,6 +20,7 @@ int timer;
 int processing_time;
 int p_num;
 int running;
+int latest_AT;
 Process* pid;
 
 typedef struct QNodeStruct {
@@ -134,9 +135,9 @@ int CPUCalc(){
             for(int i=0; i<p_num; i++){
                 if(asleep_pid[i] == -1){
                     asleep_pid[i] = processing_pid;
-                    if(pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] != 0){
-                        pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] -= 1;
-                    }
+                    // if(pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] != 0){
+                    //     pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] -= 1;
+                    // }
                     break;
                 }
             }
@@ -148,9 +149,9 @@ int CPUCalc(){
         for(int i=0; i<p_num; i++){
             if(asleep_pid[i] == -1){
                 asleep_pid[i] = processing_pid;
-                if(pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] != 0){
-                    pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] -= 1;
-                }
+                // if(pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] != 0){
+                //     pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] -= 1;
+                // }
                 
                 processing_pid = -1;
                 break;
@@ -184,7 +185,7 @@ void IOCalc(){
                 }
             }
             
-            pid[pid_asleep].io_burst_arr[cycle] -= 1;
+            // pid[pid_asleep].io_burst_arr[cycle] -= 1;
         }
     }
 }
@@ -193,6 +194,7 @@ int NewProcess(){
     int flag = 0; // 그대로 0이면 추가프로세스 없음
     for(int i=0; i<4; i++){
         if(rq->process_queue[i]->count != 0) {
+
             // printf("here 1\n");
             processing_pid = QueueFront(i);//rq->process_queue[i]->front->q_pid; // QueueFront(i);
             // processing_pid = link->pid;
@@ -249,14 +251,15 @@ int TimeTicker(){
            // printf("here\n");
             QueuePush(pid[i].queue_pos , i);
         }
-    } //printf("1\n");
-   
+    } //
+
+ZeroCPUTime:
     //현재 processing중인거 확인 후 처리. 근데 FCFS Q3는???
     IOCalc();  //printf("2\n"); 
-    if(processing_pid != -1){ // for init.
+    if(running != -1){ // for init.
         running = CPUCalc(); 
     }
-    
+    IOCalc();
     // printf("3\n");
      //처리하고나면 asleep에서 제외
     
@@ -267,22 +270,31 @@ int TimeTicker(){
     if(running == -1){
         running = NewProcess();
     }
-
     if(running == 1){
-        pid[processing_pid].runtime++;
-        // printf("%d\n", processing_pid);
-        // printf("%d\n", pid[processing_pid].cur_cycle);
-        pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] -= 1;
+        if(pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] == 0){
+            goto ZeroCPUTime;
+        }
+        else{
+            pid[processing_pid].runtime++;
+            // printf("%d\n", processing_pid);
+            // printf("%d\n", pid[processing_pid].cur_cycle);
+            pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] -= 1;
+        }
     }
     
 
     
     // processing_time++;
-    timer++;
     
-    if(running == -1 && IOCheck() == -1){
+    for(int i=0; i<p_num; i++){
+        if(asleep_pid[i] != -1){
+            pid[asleep_pid[i]].io_burst_arr[pid[asleep_pid[i]].cur_cycle] -= 1;
+        }
+    }
+    if(running == -1 && IOCheck() == -1 && timer >= latest_AT){ // 가장 늦게 도착하는 프로세스의 AT까지는 기다려야함.
         return 0;
     }
+    timer++;
     // printf("4\n");
     return 1;
 }
@@ -295,6 +307,7 @@ int main(int argc, char *argv[]) {
     processing_time = 0;
     processing_pid = -1;
     running = -1;
+    latest_AT = 0;
     fscanf(input, "%d", &p_num);
     fgetc(input);
     pid = (Process*)malloc(sizeof(Process) * p_num);
@@ -305,7 +318,10 @@ int main(int argc, char *argv[]) {
  
     for(int i=0; i<p_num; i++){
         int _cycle;
-        fscanf(input, "%d %d %d %d ", &pid[i].pid, &pid[i].arrival_time, &pid[i].queue_pos, &_cycle);
+        int at;
+        fscanf(input, "%d %d %d %d ", &pid[i].pid, &at, &pid[i].queue_pos, &_cycle);
+        if(at > latest_AT){ latest_AT = at; }
+        pid[i].arrival_time = at;
         pid[i].pid -= 1;
         pid[i].cycles = _cycle;
         pid[i].cur_cycle = 0;
