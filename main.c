@@ -114,54 +114,38 @@ int QueueFront(int _qnum){
 int CPUCalc(){
     int queue_pos = pid[processing_pid].queue_pos;
 
-    // if(queue_pos == 3){
-    //     // cpu burst 끝나서 I/O burst로
-    // }
-
     //현재 processing중인거 확인 후 처리. 근데 FCFS Q3는???
     if(rq->process_queue[queue_pos]->time_quantum == pid[processing_pid].runtime){
         pid[processing_pid].runtime = 0;
         if(pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] != 0){ // 타임퀀텀이 그냥 끝남(해당 큐의)(cpu time이 남았는데)
-            // if(pid[processing_pid].queue_pos != 3){ 어차피 여기는 Q3 안들어옴
-            //     pid[processing_pid].queue_pos += 1;
-            // }
             pid[processing_pid].queue_pos += 1;
-            if(pid[processing_pid].queue_pos == 3){
-                printf("3333\n");
-            }
             QueuePush(pid[processing_pid].queue_pos, processing_pid);
         }
         else{ // CPU타임이 끝나서 Asleep 상태로. //io가 0이면 asleep 보낼 필요 없다.
             for(int i=0; i<p_num; i++){
                 if(asleep_pid[i] == -1){
                     asleep_pid[i] = processing_pid;
-                    // if(pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] != 0){
-                    //     pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] -= 1;
-                    // }
                     break;
                 }
             }
         }
         processing_pid = -1;
+        return -1;
     }
     else if(pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] == 0){ // 현재 큐의 타임퀀텀이 남았는데 cpu burst가 끝나서 I/O asleep 상태 돌입. Q3 포함.
         pid[processing_pid].runtime = 0;
         for(int i=0; i<p_num; i++){
             if(asleep_pid[i] == -1){
                 asleep_pid[i] = processing_pid;
-                // if(pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] != 0){
-                //     pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] -= 1;
-                // }
-                
                 processing_pid = -1;
                 break;
             }
         }
+        return -1;
     }
     else{ //there is a running process
         return 1;
     }
-    return -1;
 }
 
 void IOCalc(){
@@ -184,8 +168,6 @@ void IOCalc(){
                     pid[pid_asleep].cur_cycle += 1;
                 }
             }
-            
-            // pid[pid_asleep].io_burst_arr[cycle] -= 1;
         }
     }
 }
@@ -221,7 +203,7 @@ void InAsleep(){
 }
 void RQPrint(){
     printf("TIME: %d\t", timer);
-    printf("RUNNING: %d\n", processing_pid);
+    printf("RUNNING pid: %d\t qpos: %d\n", processing_pid, pid[processing_pid].queue_pos);
     for(int i=0; i<4; i++){
         printf("QUEUE %d: ", i);
         for(int j=0; j<rq->process_queue[i]->count; j++){
@@ -256,34 +238,45 @@ int TimeTicker(){
 ZeroCPUTime:
     //현재 processing중인거 확인 후 처리. 근데 FCFS Q3는???
     IOCalc();  //printf("2\n"); 
-    if(running != -1){ // for init.
+    if(running != -1){ // if there is a running process
         running = CPUCalc(); 
     }
     IOCalc();
     // printf("3\n");
      //처리하고나면 asleep에서 제외
-    
-    
-    
     //RQ에서 processing할거 찾아서 넣기 (큐에 넣을거 다 넣은 이후) processing pid 교체.
     // 처음 프로세스 들어갈때 start time 없으면(-1) 기록하기
     if(running == -1){
         running = NewProcess();
     }
-    if(running == 1){
+    // else{//이전 과정에서 선택된 processing_pid보다 우선순위가 높은 큐에 프로세스가 대기중이라면
+    //     //processing_pid 교체 preemption! 단, q1, q2에서만 가능
+    //     for(int i=0; i<pid[processing_pid].queue_pos && i<2; i++){
+    //         if(rq->process_queue[i]->count != 0){
+    //             //현재 돌고있는놈을 해당 큐의 맨 뒤로 push
+    //             printf("PREEMPTION!!!!\n");
+    //             QueuePush(pid[processing_pid].queue_pos, processing_pid);
+    //             processing_pid = QueueFront(i);
+    //             QueuePop(i);
+    //             break;
+    //         }
+    //     }
+    // }
+
+    if(running == 1){ // running이 애초부터 1이면 newprocess 안하고 기존 실행하던거. newprocess면 어차피 제일우선순위높은놈 선택됨
         if(pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] == 0){
             goto ZeroCPUTime;
         }
         else{
+            
+            
+            
             pid[processing_pid].runtime++;
             // printf("%d\n", processing_pid);
             // printf("%d\n", pid[processing_pid].cur_cycle);
             pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] -= 1;
         }
     }
-    
-
-    
     // processing_time++;
     
     for(int i=0; i<p_num; i++){
@@ -352,6 +345,13 @@ int main(int argc, char *argv[]) {
     
     fclose(input);
     while(TimeTicker()) {printf("\n");}
+
+    for(int i=0; i<p_num; i++){
+        printf("---Process %d---\n", i);
+        printf("WT\tTT\n");
+        printf("%d\t%d\n", pid[i].process_start_time - pid[i].arrival_time, pid[i].process_end_time - pid[i].process_start_time);
+        printf("\n");
+    }
 
     ReadyQueueFree();
     free(rq);
