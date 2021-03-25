@@ -16,16 +16,6 @@ typedef struct ProcessStruct {
     int gantt[100000];
 } Process;
 
-int processing_pid;
-int* asleep_pid;
-int timer;
-int processing_time;
-int p_num;
-int running;
-int latest_AT;
-int flag_zero_io_time;
-Process* pid;
-
 typedef struct QNodeStruct {
     int q_pid;//Process *p; // int pid?
     struct QNodeStruct *next;
@@ -39,10 +29,21 @@ typedef struct QueueStruct {
 } Queue;
 
 typedef struct ReadyQueueStruct {
-    int process_num;
-    Queue* process_queue[4];
+    
 } RQ;
-RQ *rq;
+
+Queue* ready_queue[4];
+int processing_pid;
+int* asleep_pid;
+int timer;
+int p_num;
+int running;
+int flag_zero_io_time;
+Process* pid;
+
+
+
+
 
 Queue* QueueInit(int _time_quantum) {
     Queue* _q = (Queue*)malloc(sizeof(Queue));
@@ -54,23 +55,23 @@ Queue* QueueInit(int _time_quantum) {
 }
 
 void ReadyQueueInit() {
-    rq->process_queue[0] = QueueInit(1);
-    rq->process_queue[1] = QueueInit(2);
-    rq->process_queue[2] = QueueInit(4);
-    rq->process_queue[3] = QueueInit(-1);
-    // QueueInit(rq->process_queue[1], 2);
-    // QueueInit(rq->process_queue[2], 4);
-    // QueueInit(rq->process_queue[3], -1);
+    ready_queue[0] = QueueInit(1);
+    ready_queue[1] = QueueInit(2);
+    ready_queue[2] = QueueInit(4);
+    ready_queue[3] = QueueInit(-1);
+    // QueueInit(ready_queue[1], 2);
+    // QueueInit(ready_queue[2], 4);
+    // QueueInit(ready_queue[3], -1);
 }
 
 void ReadyQueueFree() {
     for(int i=0; i<4; i++){
-        free(rq->process_queue[i]);
+        free(ready_queue[i]);
     }
 }
 
 void QueuePop(int _qnum) {
-    Queue *q = rq->process_queue[_qnum];
+    Queue *q = ready_queue[_qnum];
     if(q->count == 0) {
         return;
     }
@@ -83,16 +84,12 @@ void QueuePop(int _qnum) {
     --(q->count);
 }
 
-void RunProcess(Process *_p) {
-
-}
-
 void QueuePush(int _qnum, int pid_num) {
     QNode *new_node = (QNode*)malloc(sizeof(QNode));
     new_node->next = NULL;
     new_node->q_pid = pid_num;
     // printf("here push\n");
-    Queue *q = rq->process_queue[_qnum];
+    Queue *q = ready_queue[_qnum];
     // printf("22\n");
     
     if(q->count == 0) { // empty queue;
@@ -108,17 +105,17 @@ void QueuePush(int _qnum, int pid_num) {
 }
 
 int QueueFront(int _qnum){
-    if(rq->process_queue[_qnum]->count == 0){
+    if(ready_queue[_qnum]->count == 0){
         return -1;
     }
-    return rq->process_queue[_qnum]->front->q_pid;
+    return ready_queue[_qnum]->front->q_pid;
 }
 
 int CPUCalc(){
     int queue_pos = pid[processing_pid].queue_pos;
 
     //현재 processing중인거 확인 후 처리. 근데 FCFS Q3는???
-    if(rq->process_queue[queue_pos]->time_quantum == pid[processing_pid].runtime){
+    if(ready_queue[queue_pos]->time_quantum == pid[processing_pid].runtime){
         pid[processing_pid].runtime = 0;
         if(pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] != 0){ // 타임퀀텀이 그냥 끝남(해당 큐의)(cpu time이 남았는데)
             pid[processing_pid].queue_pos += 1;
@@ -182,10 +179,10 @@ void IOCalc(){
 int NewProcess(){
     int flag = 0; // 그대로 0이면 추가프로세스 없음
     for(int i=0; i<4; i++){
-        if(rq->process_queue[i]->count != 0) {
+        if(ready_queue[i]->count != 0) {
 
             // printf("here 1\n");
-            processing_pid = QueueFront(i);//rq->process_queue[i]->front->q_pid; // QueueFront(i);
+            processing_pid = QueueFront(i);//ready_queue[i]->front->q_pid; // QueueFront(i);
             pid[processing_pid].state = 1;
             QueuePop(i);
             // printf("here 3\n");
@@ -212,8 +209,8 @@ void RQPrint(FILE* fp){
     fprintf(fp, "RUNNING pid: %d\t qpos: %d\n", processing_pid, pid[processing_pid].queue_pos);
     for(int i=0; i<4; i++){
         fprintf(fp, "QUEUE %d: ", i);
-        for(int j=0; j<rq->process_queue[i]->count; j++){
-            QNode *prn = rq->process_queue[i]->front;
+        for(int j=0; j<ready_queue[i]->count; j++){
+            QNode *prn = ready_queue[i]->front;
             fprintf(fp, "%d\t", prn->q_pid);
             prn = prn->next;
         }
@@ -308,12 +305,32 @@ ZeroCPUTime:
 
     timer++;
     for(int i=0; i<p_num; i++){
-        if(pid[i].state == 0){ // in queue
-            pid[i].gantt[timer] = pid[i].queue_pos + 4;
-            continue;
+        // if(pid[i].state == 0){ // in queue
+        //     pid[i].gantt[timer] = pid[i].queue_pos + 4;
+        //     continue;
+        // }
+        // pid[i].gantt[timer] = pid[i].state;
+        switch (pid[i].state)
+        {
+        case 0:
+            fprintf(fp, "Q%d\t", pid[i].queue_pos);
+            break;
+        case 1:
+            fprintf(fp, "|%d|\t", pid[i].queue_pos);
+            break;
+        case 2:
+            fprintf(fp, ":::\t");
+            break;
+        default: // -1 or 3
+            fprintf(fp, "\t");
+            break;
         }
-        pid[i].gantt[timer] = pid[i].state;
     }
+    fprintf(fp, "\n");
+    for(int i=0; i<p_num; i++){
+        fprintf(fp, "---------");
+    }
+    fprintf(fp, " %d\n", timer);
 
     int done = 1;
     for(int i=0; i<p_num; i++){
@@ -334,10 +351,8 @@ ZeroCPUTime:
 
 int main(int argc, char *argv[]) {
     FILE* input = fopen(argv[1], "r");
-    rq = (RQ*)malloc(sizeof(RQ));
-    ReadyQueueInit(rq);
+    ReadyQueueInit();
     timer = 0;
-    processing_time = 0;
     processing_pid = -1;
     running = -1;
     fscanf(input, "%d", &p_num);
@@ -374,19 +389,23 @@ int main(int argc, char *argv[]) {
         }
         pid[i].io_burst_arr[_cycle - 1] = 0;
 
-        // if(rq->process_queue[pid[i].queue_pos]->count == 0){
+        // if(ready_queue[pid[i].queue_pos]->count == 0){
         //     QueuePush(pid[i].queue_pos, &pid[i]);
         // }
         // else{
-        //     Queue *tmp = rq->process_queue[pid[i].queue_pos]->front;
+        //     Queue *tmp = ready_queue[pid[i].queue_pos]->front;
         // }
         pid[i].process_start_time = -1; // 시작 시간 기록용
     }
     
     fclose(input);
     FILE *output = fopen("out.txt", "w");
+    for(int i=0; i<p_num; i++){
+        fprintf(output, "P%d\t", i+1);
+    }
+    fprintf(output, "\n");
     while(TimeTicker(output));
-    GanttChart(output);
+    // GanttChart(output);
     for(int i=0; i<p_num; i++){
         printf("---Process %d---\n", i);
         printf("WT\tTT\n");
@@ -399,5 +418,5 @@ int main(int argc, char *argv[]) {
     }
     fclose(output);
     ReadyQueueFree();
-    free(rq);
+
 }
