@@ -312,18 +312,18 @@ int main(int argc, char *argv[]) {
     int avg_wt = 0;
     int avg_tt = 0;
     fprintf(output,"+-------+-------+-------+\n");
-    fprintf(output,"|P#\t|WT\t|TT\t|\n");
+    fprintf(output,"|P#\t|TT\t|WT\t|\n");
     fprintf(output,"+-------+-------+-------+\n");
     for(int i=0; i<p_num; i++){
         int tt = pid[i].process_end_time - pid[i].arrival_time;
         int wt = tt - pid[i].burst_acc;
         fprintf(output,"|P%d\t", i+1);
-        fprintf(output,"|%d\t|%d\t|\n", wt, tt);
+        fprintf(output,"|%d\t|%d\t|\n", tt, wt);
         avg_wt += wt;
         avg_tt += tt;
     }
     fprintf(output, "+-------+-------+-------+\n\n");
-    fprintf(output, "Average Wait Time: %.4f\nAverage Turnaround Time: %.4f\n", avg_wt/(float)p_num, avg_tt/(float)p_num);
+    fprintf(output, "Average Turnaround Time: %.4f\nAverage Waiting Time: %.4f\n", avg_tt/(float)p_num, avg_wt/(float)p_num);
     fclose(output);
     ReadyQueueFree();
 
