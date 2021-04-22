@@ -2,7 +2,7 @@
 #include<stdlib.h>
 #include<stdbool.h>
 
-typedef struct _process{
+typedef struct processStruct{
     int *reqestedResource;
     int *allocatedResource;
     bool available;
@@ -46,11 +46,6 @@ void freeProcess(int _pid){
 }
 
 int graphReduction(){
-    // printf("ResourceUnits: ");
-    // for(int i=0; i<resourceTypes; i++){
-    //     printf("%d\t",resourceUnit[i]);
-    // }
-    // printf("\n");
     int reductivdPid = findReductivePid();
     if(reductivdPid == -1){ 
         return 0;
@@ -71,13 +66,8 @@ int main(void){
     pid = (processStruct*)malloc(sizeof(processStruct)*processNum);
     resourceUnit = (int*)malloc(sizeof(int)*resourceTypes);
     for(int i=0; i<resourceTypes; i++){
-        if((EOF == fscanf(input, "%d", &resourceUnit[i]))){
+        if((EOF == fscanf(input, "%d ", &resourceUnit[i]))){
             printf("INVALID INPUT");
-            return 0;
-        }
-
-        if((fgetc(input) != '\n') && (i == resourceTypes-1)){
-            printf("INVALID INPUT");    
             return 0;
         }
     }
@@ -86,13 +76,8 @@ int main(void){
         pid[i].allocatedResource = (int*)malloc(sizeof(int)*resourceTypes);
         pid[i].available = true;
         for(int j=0; j<resourceTypes; j++){
-            if((EOF == fscanf(input, "%d", &pid[i].allocatedResource[j]))){
+            if((EOF == fscanf(input, "%d ", &pid[i].allocatedResource[j]))){
                 printf("INVALID INPUT");
-                return 0;
-            }
-
-            if((fgetc(input) != '\n') && (j == resourceTypes-1)){
-                printf("INVALID INPUT alloc");    
                 return 0;
             }
 
@@ -107,16 +92,17 @@ int main(void){
         pid[i].reqestedResource = (int*)malloc(sizeof(int)*resourceTypes);
 
         for(int j=0; j<resourceTypes; j++){
-            if((EOF == fscanf(input, "%d", &pid[i].reqestedResource[j]))){
+            if((EOF == fscanf(input, "%d ", &pid[i].reqestedResource[j]))){
                 printf("INVALID INPUT");
-                return 0;
-            }
-            if((fgetc(input) != '\n') && (j == resourceTypes-1) && (i != processNum-1)){
-                printf("INVALID INPUT req");    
                 return 0;
             }
         }
     }
+    if(fgetc(input) != EOF){
+        printf("INVALID INPUT");
+        return 0;
+    }
+    fclose(input);
 
     while(graphReduction());
     
@@ -163,6 +149,7 @@ int main(void){
         }
         printf("\n");
     }
+
     for(int i=0; i<processNum; i++){
         free(pid[i].allocatedResource);
         free(pid[i].reqestedResource);
