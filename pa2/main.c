@@ -15,7 +15,6 @@ int processNum;
 processStruct* pid;
 
 int findReductivePid(){
-
     for(int i=0; i<processNum; i++){
         int flag = 0;
         
@@ -34,7 +33,6 @@ int findReductivePid(){
             return i;
         }
     }
-
     return -1;
 }
 
@@ -46,11 +44,11 @@ void freeProcess(int _pid){
 }
 
 int graphReduction(){
-    int reductivdPid = findReductivePid();
-    if(reductivdPid == -1){ 
+    int reductivePid = findReductivePid();
+    if(reductivePid == -1){ 
         return 0;
     }
-    freeProcess(reductivdPid);
+    freeProcess(reductivePid);
     return 1;
 }
 
@@ -115,7 +113,7 @@ int main(void){
     }
 
     if(flag == 0){
-        printf("Not in a deadlock state\n");
+        printf("Non-deadlock State\n");
     }
     else{
         printf("Deadlocked process list\n");
