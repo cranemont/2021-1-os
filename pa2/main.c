@@ -74,11 +74,11 @@ int main(void){
     FILE* input = fopen("input.txt", "r");
 
     if((EOF == fscanf(input, "%d %d ", &processNum, &resourceTypes))){
-        printf("INVALID INPUT");
+        printf("INVALID INPUT\n");
         return 0;
     }
-    if(processNum < 0 || resourceTypes < 0){
-        printf("INVALID INPUT");
+    if(processNum <= 0 || resourceTypes <= 0){
+        printf("INVALID INPUT\n");
         return 0;
     }
 
@@ -87,7 +87,12 @@ int main(void){
     availableResource = (int*)malloc(sizeof(int)*resourceTypes);
     for(int i=0; i<resourceTypes; i++){
         if((EOF == fscanf(input, "%d ", &resourceUnit[i]))){
-            printf("INVALID INPUT");
+            printf("INVALID INPUT\n");
+            return 0;
+        }
+
+        if(resourceUnit[i] <= 0){
+            printf("INVALID INPUT unit\n");
             return 0;
         }
         availableResource[i] = resourceUnit[i];
@@ -98,12 +103,12 @@ int main(void){
         pid[i].available = true;
         for(int j=0; j<resourceTypes; j++){
             if((EOF == fscanf(input, "%d ", &pid[i].allocatedResource[j]))){
-                printf("INVALID INPUT");
+                printf("INVALID INPUT\n");
                 return 0;
             }
 
             if((availableResource[j] -= pid[i].allocatedResource[j]) < 0 || pid[i].allocatedResource[j] < 0){
-                printf("INVALID INPUT alloc");    
+                printf("INVALID INPUT alloc\n");    
                 return 0;
             };
         }
@@ -114,18 +119,18 @@ int main(void){
 
         for(int j=0; j<resourceTypes; j++){
             if((EOF == fscanf(input, "%d ", &pid[i].reqestedResource[j]))){
-                printf("INVALID INPUT");
+                printf("INVALID INPUT\n");
                 return 0;
             }
 
             if(resourceUnit[j] < pid[i].reqestedResource[j] + pid[i].allocatedResource[j] || pid[i].reqestedResource[j] < 0){
-                printf("INVALID INPUT request");
+                printf("INVALID INPUT request\n");
                 return 0;
             }
         }
     }
     if(fgetc(input) != EOF){
-        printf("INVALID INPUT");
+        printf("INVALID INPUT\n");
         return 0;
     }
     fclose(input);
@@ -160,29 +165,6 @@ int main(void){
         }
         printf("\n");
     }
-    // printf("#Ps: %d\t#R.types: %d\n", processNum, resourceTypes);
-    // printf("ResourceUnits: ");
-    // for(int i=0; i<resourceTypes; i++){
-    //     printf("%d\t",resourceUnit[i]);
-    // }
-    // printf("\n");
-
-    // for(int i=0; i<processNum; i++){
-    //     printf("Process#%d alloc: ",i);
-    //     for(int j=0; j<resourceTypes; j++){
-    //         printf("%d\t",pid[i].allocatedResource[j]);
-    //     }
-    //     printf("\n");
-    // }
-
-    // printf("\n");
-    // for(int i=0; i<processNum; i++){
-    //     printf("Process#%d req: ",i);
-    //     for(int j=0; j<resourceTypes; j++){
-    //         printf("%d\t",pid[i].reqestedResource[j]);
-    //     }
-    //     printf("\n");
-    // }
 
     for(int i=0; i<processNum; i++){
         free(pid[i].allocatedResource);

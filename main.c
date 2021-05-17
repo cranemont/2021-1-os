@@ -27,14 +27,27 @@ typedef struct QueueStruct {
     int time_quantum; // for RR
 } Queue;
 
-Queue* ready_queue[4];
 int processing_pid;
 int* asleep_pid;
 int timer;
 int p_num;
 int running;
-int flag_zero_io_time;
 Process* pid;
+Queue* ready_queue[4];
+// int flag_zero_io_time;
+
+void QueuePop(int _qnum);
+void QueuePush(int _qnum, int pid_num);
+int QueueFront(int _qnum);
+void ReadyQueueInit();
+void ReadyQueueFree();
+Queue* QueueInit(int _time_quantum);
+
+int CPUCalc();
+void IOCalc();
+int NewProcess();
+int ProcessDone();
+int TimeTicker();
 
 Queue* QueueInit(int _time_quantum) {
     Queue* _q = (Queue*)malloc(sizeof(Queue));
@@ -54,6 +67,9 @@ void ReadyQueueInit() {
 
 void ReadyQueueFree() {
     for(int i=0; i<4; i++){
+        for(int j=0; j<ready_queue[i]->count; j++){
+            QueuePop(i);
+        }
         free(ready_queue[i]);
     }
 }
@@ -90,39 +106,37 @@ void QueuePush(int _qnum, int pid_num) {
     ++(q->count);
 }
 
-int QueueFront(int _qnum){
+int QueueFront(int _qnum) {
     if(ready_queue[_qnum]->count == 0){
         return -1;
     }
     return ready_queue[_qnum]->front->q_pid;
 }
 
-int CPUCalc(){
+int CPUCalc() {
     int queue_pos = pid[processing_pid].queue_pos;
-
-    //현재 processing중인거 확인 후 처리. 근데 FCFS Q3는???
+    //현재 processing중인거 확인 후 처리.
     if(ready_queue[queue_pos]->time_quantum == pid[processing_pid].runtime){
         pid[processing_pid].runtime = 0;
-        if(pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] != 0){ // 타임퀀텀이 그냥 끝남(해당 큐의)(cpu time이 남았는데)
+        if(pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] != 0){ // 타임퀀텀이 그냥 끝남(cpu time이 남았는데)
             pid[processing_pid].queue_pos += 1;
             QueuePush(pid[processing_pid].queue_pos, processing_pid);
             pid[processing_pid].state = 0;
         }
-        else{ // CPU타임이 끝나서 Asleep 상태로. //io가 0이면 asleep 보낼 필요 없다.
-            if(pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] == 0){
-                flag_zero_io_time = 1;
-                //pid[processing_pid].queue_pos += 1;//time quantum 다 써도 not preempted.
-            }
+        else{ // CPU타임이 끝나서 Asleep 상태로. io가 0이면 asleep으로 가지 않음
+            // if(pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] == 0){
+            //     flag_zero_io_time = 1;
+            // }
             asleep_pid[processing_pid] = processing_pid;
             pid[processing_pid].state = 2;
         }
         processing_pid = -1;
         return -1;
     }
-    else if(pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] == 0){ // 현재 큐의 타임퀀텀이 남았는데 cpu burst가 끝나서 I/O asleep 상태 돌입. Q3 포함.
-        if(pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] == 0){ // 그냥 cpu타임이 처음부터 0이었을때도 여기로옴
-            flag_zero_io_time = 1;
-        }
+    else if(pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] == 0){ // 현재 큐의 타임퀀텀이 남았는데 cpu burst가 끝나서 I/O asleep 상태. Q3 포함.
+        // if(pid[processing_pid].io_burst_arr[pid[processing_pid].cur_cycle] == 0){ // cpu burst가 처음부터 0이었을때도 여기로옴
+        //     flag_zero_io_time = 1;
+        // }
         pid[processing_pid].runtime = 0;
         asleep_pid[processing_pid] = processing_pid;
         pid[processing_pid].state = 2;
@@ -147,13 +161,11 @@ void IOCalc(){
                     pid[pid_asleep].process_end_time = timer;
                     continue;
                 }
-                else{ // interrupt
-                    if(pid[pid_asleep].queue_pos != 0 && pid[pid_asleep].queue_pos != 3 && flag_zero_io_time == 0){
+                else{ // cycles left, interrupt
+                    if(pid[pid_asleep].queue_pos != 0 && pid[pid_asleep].queue_pos != 3){ // && flag_zero_io_time == 0){
                         pid[pid_asleep].queue_pos -= 1;
                     }
-                    flag_zero_io_time = 0;
-                    // 만약 다음 cpu사이클이 0이면 바로 io처리로 다시와야한다.?
-                    // 큐에서 대기할 이유가 있을까? 대기하는걸로 가정.
+                    // flag_zero_io_time = 0;
                     QueuePush(pid[pid_asleep].queue_pos, pid_asleep);
                     pid[pid_asleep].state = 0;
                     pid[pid_asleep].cur_cycle += 1;
@@ -167,7 +179,7 @@ int NewProcess(){
     int flag = 0; // 그대로 0이면 추가프로세스 없음
     for(int i=0; i<4; i++){
         if(ready_queue[i]->count != 0) {
-            processing_pid = QueueFront(i);//ready_queue[i]->front->q_pid; // QueueFront(i);
+            processing_pid = QueueFront(i);
             pid[processing_pid].state = 1;
             QueuePop(i);
             flag = 1;
@@ -180,8 +192,18 @@ int NewProcess(){
     return 1;
 }
 
+int ProcessDone(){
+    for(int i=0; i<p_num; i++){
+        if(pid[i].state != 3){
+            return -1;
+        }
+    }
+    return 1;
+}
+
 int TimeTicker(FILE *fp){
     
+    // check process' AT time and push to the ready queue
     for(int i=0; i<p_num; i++){
         if(pid[i].arrival_time == timer){
             QueuePush(pid[i].queue_pos , i);
@@ -189,23 +211,24 @@ int TimeTicker(FILE *fp){
         }
     }
 
-    IOCalc(); 
 
-ZeroCPUTime:
-    if(running != -1){ // if there is a running process
-        running = CPUCalc(); // io가 0인건 다음 iocalc가 처리
-    }
-    IOCalc();
-    if(running == -1){
-        running = NewProcess();
-        if(running == 1 && pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] == 0){
-             // 새로받은 cpu타임이 0인 특수한상황.
-            goto ZeroCPUTime;
-        }
+    IOCalc(); // Apply changes for the processes in asleep
+// ZeroCPUTime:
+    if(running == 1){ // if there is a running process
+        running = CPUCalc(); // Apply changes for the running process
+        IOCalc(); // check if i/o burst time is zero
     }
 
-    if(running == 1){ // running이 애초부터 1이면 newprocess 안하고 기존 실행하던거. newprocess면 어차피 제일우선순위높은놈 선택됨
-        
+    if(running == -1){ // if there is no running process
+        running = NewProcess(); // find next process
+        // if(running == 1 && pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] == 0){
+        //     // new process's CPU burst time is zero
+        //     goto ZeroCPUTime;
+        // }
+    }
+
+    // Apply changes
+    if(running == 1){ 
         pid[processing_pid].runtime++;
         pid[processing_pid].cpu_burst_arr[pid[processing_pid].cur_cycle] -= 1;  
     }
@@ -215,60 +238,64 @@ ZeroCPUTime:
             pid[asleep_pid[i]].io_burst_arr[pid[asleep_pid[i]].cur_cycle] -= 1;
         }
     }
-
+    // check if all the process' are done
+    if(ProcessDone() == 1){
+        return 0;
+    }
+    
     timer++;
     for(int i=0; i<p_num; i++){
         switch (pid[i].state)
         {
         case 0:
             fprintf(fp, "Q%d\t", pid[i].queue_pos);
+            printf("Q%d\t", pid[i].queue_pos);
             break;
         case 1:
             fprintf(fp, "|%d|\t", pid[i].queue_pos);
+            printf("|%d|\t", pid[i].queue_pos);
             break;
         case 2:
             fprintf(fp, ":::\t");
+            printf(":::\t");
             break;
         default: // -1 or 3
             fprintf(fp, "\t");
+            printf("\t");
             break;
         }
     }
     fprintf(fp, "\n");
+    printf("\n");
     for(int i=0; i<p_num; i++){
         fprintf(fp, "--------");
+        printf("--------");
     }
     fprintf(fp, " %d\n", timer);
+    printf(" %d\n", timer);
 
-    int done = 1;
-    for(int i=0; i<p_num; i++){
-        if(pid[i].state != 3){
-            done = 0;
-            break;
-        }
-    }
-    if(done == 1){
-        return 0;
-    }
-    
     return 1;
 }
 
 int main(int argc, char *argv[]) {
+
     FILE* input = fopen(argv[1], "r");
-    ReadyQueueInit();
-    timer = 0;
-    processing_pid = -1;
-    running = -1;
     fscanf(input, "%d", &p_num);
     fgetc(input);
+
     pid = (Process*)malloc(sizeof(Process) * p_num);
     asleep_pid = (int*)malloc(sizeof(int) * p_num);
     for(int i=0; i<p_num; i++){
         asleep_pid[i] = -1;
     }
-    
-    flag_zero_io_time = 0;
+
+    timer = 0;
+    processing_pid = -1;
+    running = -1;
+    // flag_zero_io_time = 0;
+    ReadyQueueInit(); 
+
+    // get process info from the input file
     for(int i=0; i<p_num; i++){
         int _cycle;
         int at;
@@ -286,9 +313,9 @@ int main(int argc, char *argv[]) {
             int burst;
             fscanf(input, "%d", &burst);
             fgetc(input);
+            pid[i].burst_acc += burst;
             if(j % 2 == 0){
                 pid[i].cpu_burst_arr[j/2] = burst;
-                pid[i].burst_acc += burst;
             }
             else{
                 pid[i].io_burst_arr[j/2] = burst;
@@ -301,30 +328,53 @@ int main(int argc, char *argv[]) {
     FILE *output = fopen("out.txt", "w");
     for(int i=0; i<p_num; i++){
         fprintf(output, "P%d\t", i+1);
+        printf("P%d\t", i+1);
     }
     fprintf(output, "\n");
+    printf("\n");
     for(int i=0; i<p_num; i++){
         fprintf(output, "--------");
+        printf("--------");
     }
     fprintf(output, " 0\n");
+    printf(" 0\n");
+
+    // PROCESSING
     while(TimeTicker(output));
+
     fprintf(output, "\n");
+    printf("\n");
+
     int avg_wt = 0;
     int avg_tt = 0;
     fprintf(output,"+-------+-------+-------+\n");
     fprintf(output,"|P#\t|TT\t|WT\t|\n");
     fprintf(output,"+-------+-------+-------+\n");
+    printf("+-------+-------+-------+\n");
+    printf("|P#\t|TT\t|WT\t|\n");
+    printf("+-------+-------+-------+\n");
     for(int i=0; i<p_num; i++){
         int tt = pid[i].process_end_time - pid[i].arrival_time;
         int wt = tt - pid[i].burst_acc;
         fprintf(output,"|P%d\t", i+1);
         fprintf(output,"|%d\t|%d\t|\n", tt, wt);
+        printf("|P%d\t", i+1);
+        printf("|%d\t|%d\t|\n", tt, wt);
         avg_wt += wt;
         avg_tt += tt;
     }
     fprintf(output, "+-------+-------+-------+\n\n");
     fprintf(output, "Average Turnaround Time: %.4f\nAverage Waiting Time: %.4f\n", avg_tt/(float)p_num, avg_wt/(float)p_num);
+    printf("+-------+-------+-------+\n\n");
+    printf("Average Turnaround Time: %.4f\nAverage Waiting Time: %.4f\n", avg_tt/(float)p_num, avg_wt/(float)p_num);
+    
+    for(int i=0; i<p_num; i++){
+        free(pid[i].cpu_burst_arr);
+        free(pid[i].io_burst_arr);
+    }
+    free(pid);
+    free(asleep_pid);
     fclose(output);
     ReadyQueueFree();
-
+    return 0;
 }
