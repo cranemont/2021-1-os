@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <priorityQueue.h>
+#include "priorityQueue.h"
 
 int time;
 
