@@ -1,6 +1,7 @@
-#include "priorityQueue.h";
-#include <stdlib.h>;
-
+#include "priorityQueue.h"
+#include<stdio.h> //없애기
+#include<stdlib.h>
+#define DEFAULT 1
 void QueueInit(priorityQueueStruct *pq){
     pq->head = (Node*)malloc(sizeof(Node));
     pq->tail = (Node*)malloc(sizeof(Node));
@@ -13,7 +14,7 @@ void QueueInit(priorityQueueStruct *pq){
 
 /* CREATE NODE */
 
-Node* CreateNode(int _timeStamp, char _pageNum){
+Node* CreateNode(int _timeStamp, int _pageNum){
     Node* newNode = (Node*)malloc(sizeof(Node));
     newNode->timeStamp = _timeStamp;
     newNode->pageNum = _pageNum;
@@ -22,21 +23,22 @@ Node* CreateNode(int _timeStamp, char _pageNum){
     return newNode;
 }
 
-Node* CreateFIFONode(int _timeStamp, char _pageNum){
+Node* CreateFIFONode(int _timeStamp, int _pageNum){
     Node* newNode = CreateNode(_timeStamp, _pageNum);
     return newNode;
 }
 
-Node* CreateLRUNode(int _timeStamp, char _pageNum){
+Node* CreateLRUNode(int _timeStamp, int _pageNum){
     Node* newNode = CreateNode(_timeStamp, _pageNum);
     newNode->lastReferenceTime = _timeStamp;
     return newNode;
 }
 
-Node* CreateLFUNode(int _timeStamp, char _pageNum){
+Node* CreateLFUNode(int _timeStamp, int _pageNum){
     Node* newNode = CreateNode(_timeStamp, _pageNum);
     newNode->lastReferenceTime = _timeStamp;
     newNode->referenceCount = 1;
+    newNode->cc = DEFAULT;
     return newNode;
 }
 
@@ -82,7 +84,7 @@ Node* searchLFUInsertPos(priorityQueueStruct *pq, int _referenceCount){
     return pos;
 }
 
-Node* findPage(priorityQueueStruct *pq, char _pageNum){
+Node* findPage(priorityQueueStruct *pq, int _pageNum){
     Node* target = pq->head->next;
     while(target != pq->tail){
         if(target->pageNum == _pageNum){
@@ -93,15 +95,17 @@ Node* findPage(priorityQueueStruct *pq, char _pageNum){
     return NULL;
 }
 
-void UpdateLRU(priorityQueueStruct *pq, int _timeStamp, char _pageNum){
+void UpdateLRU(priorityQueueStruct *pq, int _timeStamp, int _pageNum){
     Node* targetPageFrame = findPage(pq, _pageNum);
+    Node* tmp = pq->head->next;
     targetPageFrame->lastReferenceTime = _timeStamp;
     targetPageFrame->prev->next = targetPageFrame->next;
     targetPageFrame->next->prev = targetPageFrame->prev;
-    InsertTail(pq, targetPageFrame);
+    _insert(pq->tail, targetPageFrame);
 }
 
-void UpdateLFU(priorityQueueStruct *pq, int _timeStamp, char _pageNum){
+void UpdateLFU(priorityQueueStruct *pq, int _timeStamp, int _pageNum){
+    
     Node* targetPageFrame = findPage(pq, _pageNum);
     targetPageFrame->lastReferenceTime = _timeStamp;
     targetPageFrame->referenceCount += 1;
@@ -110,7 +114,6 @@ void UpdateLFU(priorityQueueStruct *pq, int _timeStamp, char _pageNum){
     Node* targetPos = searchLFUInsertPos(pq, targetPageFrame->referenceCount);
     _insert(targetPos, targetPageFrame);
 }
-
 
 void Pop(priorityQueueStruct *pq){
     Node* front = Front(pq);
